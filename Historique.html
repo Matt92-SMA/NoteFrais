@@ -52,26 +52,5 @@
     <h2>🗂️ Anciennes NDF</h2>
     <div id="ndfList"></div>
   </div>
-
-  <script>
-    const data = JSON.parse(localStorage.getItem("historiqueNDF") || "[]");
-    const container = document.getElementById("ndfList");
-
-    if (data.length === 0) {
-      container.innerHTML = "<p>Aucune note enregistrée.</p>";
-    } else {
-      data.forEach(item => {
-        const div = document.createElement("div");
-        div.className = "ndf-item";
-        div.innerHTML = `
-          <strong>${item.nom} ${item.prenom}</strong><br>
-          Mois : ${item.mois}<br>
-          <em>Exporté le ${new Date(item.dateExport).toLocaleDateString()}</em><br>
-          <a href="${item.fichier}" download>Télécharger PDF</a>
-        `;
-        container.appendChild(div);
-      });
-    }
-  </script>
 </body>
 </html>
