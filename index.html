@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Note de frais</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    :root{
+      --brand:#e67e22;      /* proche de votre palette */
+      --brand-dark:#cf711a; /* hover */
+      --title:#d35400;
+      --bg:#fff8f0;
+      --panel:#fdf2e9;
+    }
+
+    body {
+      font-family: sans-serif;
+      background-color: var(--bg);
+      color: #fd7702;
+      padding: 20px;
+    }
+
+    h2, h3 { color: var(--title); }
+
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+
+    /* Champs par défaut : largeur contrôlée (pas plein écran) */
+    input, select {
+      padding: 5px;
+      border: 1px solid var(--brand);
+      border-radius: 4px;
+      width: 100%;
+      max-width: 300px;
+    }
+
+    button {
+      margin-top: 10px;
+      background-color: var(--brand);
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 1em;
+    }
+    button:hover { background-color: var(--brand-dark); }
+
+    /* Tableau */
+    .table-wrapper{ margin-top:20px; overflow-x:auto; }
+    table {
+      width: 100%;
+      min-width: 720px;              /* défilement horizontal si écran étroit */
+      border-collapse: collapse;
+      background-color: #fff;
+    }
+    th, td {
+      border: 1px solid var(--brand);
+      padding: 8px;
+      text-align: left;
+    }
+    th { background-color: #f39c12; color: white; }
+
+    .hidden { display: none; }
+
+    /* Panneau historique (inchangé, mais nom de variables) */
+    #sidebar {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 250px;
+      background-color: var(--panel);
+      border: 1px solid var(--brand);
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 2px 2px 6px rgba(0,0,0,0.1);
+    }
+    #historiqueNDF { list-style: none; padding-left: 0; }
+    #historiqueNDF li { margin-bottom: 5px; font-size: 0.9em; cursor: pointer; text-decoration: underline; }
+
+    /* En-tête en 2 colonnes sur large, empilé sur petit */
+    .header-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 40px;
+      margin-bottom: 20px;
+      align-items: flex-start;
+    }
+    .header-col { flex: 1 1 300px; }
+
+    /* ===== Segmented control : choix du type de note ===== */
+    .type-switch {
+      display: inline-grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--brand);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 12px;
+      user-select: none;
+    }
+    .type-switch input { position: absolute; opacity: 0; pointer-events: none; }
+    .type-switch label {
+      padding: 8px 12px;
+      text-align: center;
+      cursor: pointer;
+      background: #fff;
+      color: var(--brand);
+      white-space: nowrap;
+      font-size: .95rem;
+    }
+    .type-switch input:checked + label {
+      background: var(--brand);
+      color: #fff;
+      font-weight: 600;
+    }
+    .type-hint { display:block; margin-top:6px; color:#8a5a2b; font-size:.9rem; }
+
+    /* ===== Mobile ===== */
+    @media (max-width: 600px) {
+      body { padding: 12px; }
+
+      /* Champs compacts : pas 100 %, centrés et lisibles */
+      input, select, button {
+        width: 92%;
+        max-width: 360px;
+        font-size: 1em;
+        padding: 8px;
+      }
+
+      .header-grid { flex-direction: column; gap: 10px; }
+      .header-col { flex: 1 1 100%; }
+
+      table th, table td { font-size: 0.85em; padding: 6px; }
+      h2, h3 { font-size: 1.3em; }
+
+      /* Le panneau historique passe sous le contenu */
+      #sidebar {
+        position: static;
+        width: 100%;
+        margin-top: 16px;
+      }
+    }
+	:root{
+  /* largeur du rail (desktop / mobile) */
+  --rail-w: 64px;
+  --rail-w-sm: 48px;
+
+  /* couleurs proches de votre palette */
+  --rail-bg: #fdf2e9;   /* plus soutenu que le fond #fff8f0 */
+  --rail-line: #e67e22; /* votre orange (trait) */
+}
+
+/* Rail gauche plein-volet */
+.left-rail{
+  position: fixed;
+  inset: 0 auto 0 0;              /* top:0; left:0; bottom:0 */
+  width: var(--rail-w);
+  background: var(--rail-bg);
+  border-right: 2px solid var(--rail-line);
+  z-index: 0;                      /* derrière le contenu */
+}
+
+/* Décale le contenu pour ne pas passer sous le rail */
+body{
+  /* votre padding existant + marge pour le rail */
+  padding-left: calc(20px + var(--rail-w));
+  position: relative;              /* crée un nouveau contexte (au cas où) */
+  z-index: 1;
+}
+
+/* Ajustements mobiles */
+@media (max-width: 600px){
+  .left-rail{ width: var(--rail-w-sm); }
+  body{
+    padding-left: calc(12px + var(--rail-w-sm)); /* votre padding mobile + rail */
+  }
+}
+  </style>
+
+  <!-- libs PDF -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  <script defer src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+</head>
+<body>
+  <h2>Note de frais - SOFT MEDICAL AESTHETICS</h2>
+
+  <div id="header-section" class="header-grid">
+    <div class="header-col">
+      <label>Nom : <input type="text" id="nom" required></label>
+      <label>Prénom : <input type="text" id="prenom" required></label>
+      <label>Responsable : <input type="text" id="responsable" required></label>
+    </div>
+
+	<div class="left-rail" aria-hidden="true"></div>
+
+    <div class="header-col">
+      <label>Service :
+        <select id="service" required>
+          <option value="">-- Sélectionner --</option>
+          <option>ADV</option>
+          <option>ADMIN</option>
+          <option>COMM</option>
+          <option>QUALITE</option>
+          <option>R&D</option>
+          <option>REGLEMENTAIRE</option>
+          <option>SALES</option>
+        </select>
+      </label>
+      <label>Mois : <input type="month" id="mois" required></label>
+
+      <!-- Sélecteur cliquable du type de note -->
+      <div aria-label="Type de note de frais" role="radiogroup" class="type-switch" id="typeSwitch">
+        <input type="radio" id="type-perso" name="ndfType" value="Dépenses Personnelles" checked>
+        <label for="type-perso">Dépenses personnelles</label>
+
+        <input type="radio" id="type-cb" name="ndfType" value="CB">
+        <label for="type-cb">CB</label>
+      </div>
+      <small id="typeSelection" class="type-hint">Sélection : <strong>Dépenses personnelles</strong></small>
+    </div>
+  </div>
+
+  <a href="Historique.html"><button>📁 Voir mes anciennes NDF</button></a>
+  <button onclick="toggleLigneForm()">➕ Ajouter une ligne de frais</button>
+
+  <form id="fraisForm" class="hidden">
+    <h3>Nouvelle ligne de frais</h3>
+    <label>Date : <input type="date" id="date" required></label>
+    <label>Type :
+      <select id="type">
+        <option>Repas</option>
+        <option>Transport</option>
+        <option>Hôtel</option>
+        <option>Indemnités Kilométriques</option>
+        <option>Péages & Parking</option>
+        <option>Achat de Matériel</option>
+        <option>Poste</option>
+        <option>Autre</option>
+      </select>
+    </label>
+    <label>Montant TTC (€) : <input type="number" id="ttc" step="0.01" required></label>
+    <label>TVA :
+      <select id="tva">
+        <option value="0.20">20%</option>
+        <option value="0.10">10%</option>
+        <option value="0.055">5.5%</option>
+        <option value="0">0%</option>
+      </select>
+    </label>
+    <label>Description : <input type="text" id="description"></label>
+    <label>Justificatif : <input type="file" id="justificatif" accept="image/*,.pdf" capture="environment" required></label>
+    <button type="submit">Ajouter la ligne</button>
+  </form>
+
+  <h3>Tableau récapitulatif</h3>
+  <div id="pdf-content">
+    <p id="identite"></p>
+    <div class="table-wrapper">
+      <table id="tableFrais">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Type</th>
+            <th>HT (€)</th>
+            <th>TVA (€)</th>
+            <th>TTC (€)</th>
+            <th>Description</th>
+            <th>Justificatif</th>
+            <th>Supprimer</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+          <tr>
+            <th colspan="2">Total</th>
+            <th id="totalHT">0.00</th>
+            <th id="totalTVA">0.00</th>
+            <th id="totalTTC">0.00</th>
+            <th colspan="3"></th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <button onclick="generatePDF()">📄 Exporter en PDF</button>
+  <button onclick="ouvrirOutlook()">✉️ Envoyer par Outlook</button>
+
+  <script>
+    const form = document.getElementById('fraisForm');
+    const tbody = document.querySelector('#tableFrais tbody');
+    const identite = document.getElementById('identite');
+    const justificatifs = [];
+    let typeNdf = 'Dépenses personnelles';
+
+    function toggleLigneForm() {
+      form.classList.toggle('hidden');
+      if (!form.classList.contains('hidden')) {
+        form.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    function mettreAJourTotal() {
+      let totalHT = 0, totalTVA = 0, totalTTC = 0;
+      tbody.querySelectorAll('tr').forEach(tr => {
+        totalHT += parseFloat(tr.children[2].innerText) || 0;
+        totalTVA += parseFloat(tr.children[3].innerText) || 0;
+        totalTTC += parseFloat(tr.children[4].innerText) || 0;
+      });
+      document.getElementById('totalHT').innerText = totalHT.toFixed(2);
+      document.getElementById('totalTVA').innerText = totalTVA.toFixed(2);
+      document.getElementById('totalTTC').innerText = totalTTC.toFixed(2);
+    }
+
+    function majIdentite() {
+      const nom = document.getElementById('nom').value.trim();
+      const prenom = document.getElementById('prenom').value.trim();
+      const service = document.getElementById('service').value.trim();
+      const mois = document.getElementById('mois').value;
+      if (nom && prenom && service && mois) {
+        identite.innerText = `Nom : ${nom} ${prenom} — Service : ${service} — Mois : ${mois} — Type : ${typeNdf}`;
+      }
+    }
+
+    // Sélecteur du type
+    document.querySelectorAll('input[name="ndfType"]').forEach(r => {
+      r.addEventListener('change', (e) => {
+        typeNdf = e.target.value;
+        document.getElementById('typeSelection').innerHTML = 'Sélection : <strong>' + typeNdf + '</strong>';
+        majIdentite();
+      });
+    });
+
+    // Mettre à jour l'identité dès qu'on remplit les champs d'en-tête
+    ['nom','prenom','service','mois'].forEach(id => {
+      const el = document.getElementById(id);
+      el.addEventListener('input', majIdentite);
+      el.addEventListener('change', majIdentite);
+    });
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const date = document.getElementById('date').value;
+      const type = document.getElementById('type').value;
+      const ttc = parseFloat(document.getElementById('ttc').value);
+      const tauxTVA = parseFloat(document.getElementById('tva').value);
+      const description = document.getElementById('description').value;
+      const fichier = document.getElementById('justificatif').files[0];
+      const ht = (ttc / (1 + tauxTVA)).toFixed(2);
+      const tva = (ttc - ht).toFixed(2);
+
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${date}</td>
+        <td>${type}</td>
+        <td>${ht}</td>
+        <td>${tva}</td>
+        <td>${ttc.toFixed(2)}</td>
+        <td>${description}</td>
+        <td>${fichier.name}</td>
+        <td><button type="button" onclick="this.closest('tr').remove(); mettreAJourTotal();">❌</button></td>
+      `;
+      tbody.appendChild(row);
+      mettreAJourTotal();
+
+      const reader = new FileReader();
+      reader.onload = () => justificatifs.push({ name: fichier.name, data: reader.result });
+      reader.readAsArrayBuffer(fichier);
+
+      form.reset();
+      form.classList.add('hidden');
+      majIdentite();
+    });
+
+    function genererIDUnique(mois) {
+      const [annee, moisNum] = mois.split("-");
+      const prefixe = annee.slice(2) + moisNum;
+      const compteurCle = "compteur_" + prefixe;
+      let compteur = parseInt(localStorage.getItem(compteurCle) || "0", 10);
+      compteur++;
+      localStorage.setItem(compteurCle, compteur);
+      return `${prefixe}-${compteur.toString().padStart(4, "0")}`;
+    }
+
+    async function generatePDF() {
+      if (!confirm("Souhaitez-vous vraiment exporter cette note de frais en PDF ?")) return;
+      const nom = document.getElementById('nom').value.trim();
+      const prenom = document.getElementById('prenom').value.trim();
+      const service = document.getElementById('service').value.trim();
+      const mois = document.getElementById('mois').value;
+      const responsable = document.getElementById('responsable').value;
+      if (!nom || !prenom || !responsable || !service || !mois) {
+        alert("Merci de remplir Nom, Prénom, Service et Mois.");
+        return;
+      }
+
+      const idNDF = genererIDUnique(mois);
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.setFontSize(12);
+      doc.text(`Note de frais`, 10, 10);
+      doc.text(`ID Note de frais : ${idNDF}`, 10, 20);
+      doc.text(`Nom : ${nom} ${prenom}`, 10, 30);
+      doc.text(`Service : ${service}`, 10, 37);
+      doc.text(`Période : ${mois}`, 10, 44);
+      doc.text(`Type : ${typeNdf}`, 10, 51);
+
+      const rows = Array.from(tbody.querySelectorAll('tr')).map(tr => [
+        tr.children[0].innerText,
+        tr.children[1].innerText,
+        tr.children[2].innerText,
+        tr.children[3].innerText,
+        tr.children[4].innerText,
+        tr.children[5].innerText
+      ]);
+      rows.push(["", "TOTAL", document.getElementById('totalHT').innerText, document.getElementById('totalTVA').innerText, document.getElementById('totalTTC').innerText, ""]);
+
+      doc.autoTable({ head: [['Date', 'Type', 'HT (€)', 'TVA (€)', 'TTC (€)', 'Description']], body: rows, startY: 58 });
+
+      const mainPdfBytes = doc.output('arraybuffer');
+      const pdfDoc = await PDFLib.PDFDocument.create();
+      const mainDoc = await PDFLib.PDFDocument.load(mainPdfBytes);
+      const copiedPages = await pdfDoc.copyPages(mainDoc, mainDoc.getPageIndices());
+      copiedPages.forEach(p => pdfDoc.addPage(p));
+
+      for (const file of justificatifs) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        try {
+          if (ext === 'pdf') {
+            const jf = await PDFLib.PDFDocument.load(file.data);
+            const pages = await pdfDoc.copyPages(jf, jf.getPageIndices());
+            pages.forEach(p => pdfDoc.addPage(p));
+          } else {
+            const img = await pdfDoc.embedJpg(file.data).catch(() => pdfDoc.embedPng(file.data));
+            const a4Width = 595.28, a4Height = 841.89;
+            const imgHeightTarget = a4Height * 0.9;
+            const aspectRatio = img.width / img.height;
+            const imgWidthTarget = imgHeightTarget * aspectRatio;
+            const x = (a4Width - imgWidthTarget) / 2;
+            const y = (a4Height - imgHeightTarget) / 2;
+            const page = pdfDoc.addPage([a4Width, a4Height]);
+            page.drawRectangle({ x: 0, y: 0, width: a4Width, height: a4Height, color: PDFLib.rgb(1, 1, 1) });
+            page.drawImage(img, { x, y, width: imgWidthTarget, height: imgHeightTarget });
+          }
+        } catch (e) {
+          alert(`Erreur avec le fichier : ${file.name}`);
+        }
+      }
+
+      const finalPdfBytes = await pdfDoc.save();
+      const blob = new Blob([finalPdfBytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const suffixType = (typeNdf === 'CB') ? 'CB' : 'Perso';
+      link.href = url;
+      link.download = `NDF_${idNDF}_${nom}_${prenom}_${suffixType}.pdf`;
+      link.click();
+
+      const histo = JSON.parse(localStorage.getItem("historiqueNDF") || "[]");
+      histo.unshift({ id: idNDF, nom, prenom, mois, type: typeNdf, fichier: link.download, dateExport: new Date().toISOString() });
+      localStorage.setItem("historiqueNDF", JSON.stringify(histo));
+    }
+
+    function ouvrirOutlook() {
+      const nom = document.getElementById('nom').value.trim();
+      const prenom = document.getElementById('prenom').value.trim();
+      const mois = document.getElementById('mois').value;
+      if (!nom || !prenom || !mois) {
+        alert("Merci de remplir Nom, Prénom et Mois avant d’envoyer.");
+        return;
+      }
+      const sujet = encodeURIComponent(`Note de frais (${typeNdf}) - ${prenom} ${nom} - ${mois}`);
+      const corps = encodeURIComponent("Bonjour,\n\nVeuillez trouver ci-joint ma note de frais.\n\nCordialement,\n\n" + prenom + " " + nom);
+      window.location.href = `mailto:?subject=${sujet}&body=${corps}`;
+    }
+  </script>
+</body>
+</html>
