@@ -76,9 +76,8 @@ let scans = JSON.parse(localStorage.getItem("barcode_scans")) || [];
 let html5QrCode = new Html5Qrcode("reader");
 let cameras = [];
 let currentCameraIndex = 0;
-let scannerRunning = false;
 let lastScanTime = 0;
-    
+
 const tableBody = document.getElementById("dataTable");
 
 // ===============================
@@ -93,8 +92,8 @@ function renderTable() {
 
         tr.innerHTML = `
             <td>${scan.code}</td>
-            <td>${scan.quantity}</td>
-            <td>${scan.lastScan}</td>
+            <td>${scan.quantity || 1}</td>
+            <td>${scan.lastScan || scan.date}</td>
         `;
 
         tableBody.appendChild(tr);
@@ -121,18 +120,17 @@ document.body.insertBefore(messageDiv, document.querySelector("table"));
 
 function onScanSuccess(decodedText) {
 
-const nowTime = Date.now();
-if (nowTime - lastScanTime < 800) return;
-lastScanTime = nowTime;
-    
+    const nowTime = Date.now();
+    if (nowTime - lastScanTime < 800) return;
+    lastScanTime = nowTime;
+
     const now = new Date();
     const formattedDate = now.toLocaleString();
 
-    // Cherche si le code existe déjà
     let existing = scans.find(item => item.code === decodedText);
 
     if (existing) {
-        existing.quantity += 1;
+        existing.quantity = (existing.quantity || 1) + 1;
         existing.lastScan = formattedDate;
     } else {
         scans.push({
@@ -149,6 +147,7 @@ lastScanTime = nowTime;
 
     messageDiv.innerText = "✔️ Article ajouté";
     setTimeout(() => messageDiv.innerText = "", 1000);
+}
 
 // ===============================
 // DÉMARRAGE SCANNER
@@ -156,20 +155,26 @@ lastScanTime = nowTime;
 
 function startScanner(cameraConfig) {
 
-html5QrCode.start(
-    cameraConfig,
-    {
-        fps: 15,
-        qrbox: { width: 300, height: 150 }, // rectangle horizontal
-        aspectRatio: 1.777, // meilleur pour caméra mobile
-        experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true
-        }
-    },
-    onScanSuccess
-)
+    html5QrCode.start(
+        cameraConfig,
+        {
+            fps: 15,
+            qrbox: { width: 300, height: 150 },
+            aspectRatio: 1.777,
+            experimentalFeatures: {
+                useBarCodeDetectorIfSupported: true
+            }
+        },
+        onScanSuccess
+    ).catch(err => {
+        console.error("Erreur démarrage caméra :", err);
+    });
+}
 
-// Charger caméras
+// ===============================
+// CHARGER CAMÉRAS
+// ===============================
+
 Html5Qrcode.getCameras().then(devices => {
 
     if (!devices || devices.length === 0) {
@@ -178,8 +183,6 @@ Html5Qrcode.getCameras().then(devices => {
     }
 
     cameras = devices;
-
-    // 🔥 Démarrage fiable en caméra arrière
     startScanner({ facingMode: "environment" });
 
 }).catch(err => {
@@ -197,7 +200,6 @@ function switchCamera() {
     html5QrCode.stop().then(() => {
 
         currentCameraIndex++;
-
         if (currentCameraIndex >= cameras.length) {
             currentCameraIndex = 0;
         }
@@ -223,10 +225,10 @@ function exportCSV() {
         return;
     }
 
-    let csvContent = "Code Barre,Date Heure\n";
+    let csvContent = "Code Barre,Quantité,Dernier Scan\n";
 
     scans.forEach(scan => {
-        csvContent += `"${scan.code}","${scan.date}"\n`;
+        csvContent += `"${scan.code}","${scan.quantity}","${scan.lastScan}"\n`;
     });
 
     const blob = new Blob([csvContent], { type: "text/csv" });
@@ -234,7 +236,7 @@ function exportCSV() {
 
     const a = document.createElement("a");
     a.href = url;
-    a.download = "scans_code_barre.csv";
+    a.download = "inventaire.csv";
     a.click();
 
     URL.revokeObjectURL(url);
@@ -247,7 +249,6 @@ function exportCSV() {
 function clearData() {
 
     if (confirm("Supprimer toutes les données ?")) {
-
         localStorage.removeItem("barcode_scans");
         scans = [];
         renderTable();
@@ -256,6 +257,4 @@ function clearData() {
 
 </script>
 
-</body>
-</html>
 
