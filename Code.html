@@ -44,8 +44,8 @@ th {
     color: white;
 }
 </style>
-
 </head>
+
 <body>
 
 <h2>Lecteur de Code Barre</h2>
@@ -57,45 +57,73 @@ th {
 <button onclick="switchCamera()">Changer de caméra</button>
 
 <table>
-    <thead>
-        <tr>
-            <th>Code Barre</th>
-            <th>Date / Heure</th>
-        </tr>
-    </thead>
-    <tbody id="dataTable"></tbody>
+<thead>
+<tr>
+<th>Code Barre</th>
+<th>Date / Heure</th>
+</tr>
+</thead>
+<tbody id="dataTable"></tbody>
 </table>
 
 <script>
 
-// Charger données existantes
+// ===============================
+// VARIABLES GLOBALES
+// ===============================
+
 let scans = JSON.parse(localStorage.getItem("barcode_scans")) || [];
+let html5QrCode = new Html5Qrcode("reader");
+let cameras = [];
+let currentCameraIndex = 0;
+let scannerRunning = false;
+
 const tableBody = document.getElementById("dataTable");
+
+// ===============================
+// AFFICHAGE TABLE
+// ===============================
 
 function renderTable() {
     tableBody.innerHTML = "";
+
     scans.forEach(scan => {
-        let row = `<tr>
-            <td>${scan.code}</td>
-            <td>${scan.date}</td>
-        </tr>`;
-        tableBody.innerHTML += row;
+        const tr = document.createElement("tr");
+
+        const tdCode = document.createElement("td");
+        tdCode.textContent = scan.code;
+
+        const tdDate = document.createElement("td");
+        tdDate.textContent = scan.date;
+
+        tr.appendChild(tdCode);
+        tr.appendChild(tdDate);
+
+        tableBody.appendChild(tr);
     });
 }
 
 renderTable();
 
-// Message visuel
+// ===============================
+// MESSAGE VISUEL
+// ===============================
+
 const messageDiv = document.createElement("div");
 messageDiv.style.fontSize = "20px";
 messageDiv.style.fontWeight = "bold";
 messageDiv.style.color = "green";
 messageDiv.style.marginTop = "10px";
+
 document.body.insertBefore(messageDiv, document.querySelector("table"));
+
+// ===============================
+// SCAN SUCCESS
+// ===============================
 
 function onScanSuccess(decodedText) {
 
-    // Éviter doublons immédiats
+    // Éviter doublon immédiat
     if (scans.length > 0 && scans[scans.length - 1].code === decodedText) {
         return;
     }
@@ -113,18 +141,26 @@ function onScanSuccess(decodedText) {
 
     renderTable();
 
-    // ✅ Afficher message
+    // Vibration mobile
+    if (navigator.vibrate) {
+        navigator.vibrate(200);
+    }
+
     messageDiv.innerText = "✅ Passer à l'article suivant";
 
-    // Effacer message après 2 secondes
     setTimeout(() => {
         messageDiv.innerText = "";
     }, 2000);
 }
 
-function startScanner(cameraId) {
+// ===============================
+// DÉMARRAGE SCANNER
+// ===============================
+
+function startScanner(cameraConfig) {
+
     html5QrCode.start(
-        cameraId,
+        cameraConfig,
         {
             fps: 10,
             qrbox: 250
@@ -137,28 +173,55 @@ function startScanner(cameraId) {
     });
 }
 
-// Charger caméras disponibles
+// Charger caméras
 Html5Qrcode.getCameras().then(devices => {
-    if (devices && devices.length) {
-        cameras = devices;
 
-        // Par défaut on prend la caméra arrière si possible
-        let backIndex = devices.findIndex(device =>
-            device.label.toLowerCase().includes("back") ||
-            device.label.toLowerCase().includes("rear") ||
-            device.label.toLowerCase().includes("environment")
-        );
-
-        currentCameraIndex = backIndex !== -1 ? backIndex : 0;
-
-        startScanner(cameras[currentCameraIndex].id);
+    if (!devices || devices.length === 0) {
+        alert("Aucune caméra détectée");
+        return;
     }
+
+    cameras = devices;
+
+    // 🔥 Démarrage fiable en caméra arrière
+    startScanner({ facingMode: "environment" });
+
 }).catch(err => {
     console.error("Erreur accès caméras :", err);
 });
 
-// Export CSV
+// ===============================
+// CHANGER CAMÉRA
+// ===============================
+
+function switchCamera() {
+
+    if (!cameras.length) return;
+
+    html5QrCode.stop().then(() => {
+
+        currentCameraIndex++;
+
+        if (currentCameraIndex >= cameras.length) {
+            currentCameraIndex = 0;
+        }
+
+        startScanner(cameras[currentCameraIndex].id);
+
+        messageDiv.innerText = "📷 Caméra changée";
+        setTimeout(() => messageDiv.innerText = "", 2000);
+
+    }).catch(err => {
+        console.error("Erreur changement caméra :", err);
+    });
+}
+
+// ===============================
+// EXPORT CSV
+// ===============================
+
 function exportCSV() {
+
     if (scans.length === 0) {
         alert("Aucune donnée à exporter.");
         return;
@@ -181,39 +244,21 @@ function exportCSV() {
     URL.revokeObjectURL(url);
 }
 
-// Vider données
+// ===============================
+// VIDER DONNÉES
+// ===============================
+
 function clearData() {
+
     if (confirm("Supprimer toutes les données ?")) {
+
         localStorage.removeItem("barcode_scans");
         scans = [];
         renderTable();
     }
-}
-function switchCamera() {
-
-    if (!cameras.length) return;
-
-    html5QrCode.stop().then(() => {
-
-        // Passer à la caméra suivante
-        currentCameraIndex++;
-        if (currentCameraIndex >= cameras.length) {
-            currentCameraIndex = 0;
-        }
-
-        startScanner(cameras[currentCameraIndex].id);
-
-        messageDiv.innerText = "📷 Caméra changée";
-        setTimeout(() => messageDiv.innerText = "", 2000);
-
-    }).catch(err => {
-        console.error("Erreur changement caméra :", err);
-    });
 }
 
 </script>
 
 </body>
 </html>
-
-
