@@ -189,9 +189,31 @@ function clearData() {
         renderTable();
     }
 }
+function switchCamera() {
+
+    if (!cameras.length) return;
+
+    html5QrCode.stop().then(() => {
+
+        // Passer à la caméra suivante
+        currentCameraIndex++;
+        if (currentCameraIndex >= cameras.length) {
+            currentCameraIndex = 0;
+        }
+
+        startScanner(cameras[currentCameraIndex].id);
+
+        messageDiv.innerText = "📷 Caméra changée";
+        setTimeout(() => messageDiv.innerText = "", 2000);
+
+    }).catch(err => {
+        console.error("Erreur changement caméra :", err);
+    });
+}
 
 </script>
 
 </body>
 </html>
+
 
