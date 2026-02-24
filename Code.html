@@ -54,6 +54,7 @@ th {
 
 <button onclick="exportCSV()">Exporter en CSV</button>
 <button onclick="clearData()">Vider les données</button>
+<button onclick="switchCamera()">Changer de caméra</button>
 
 <table>
     <thead>
@@ -121,30 +122,39 @@ function onScanSuccess(decodedText) {
     }, 2000);
 }
 
-// Initialiser scanner
-const html5QrCode = new Html5Qrcode("reader");
+function startScanner(cameraId) {
+    html5QrCode.start(
+        cameraId,
+        {
+            fps: 10,
+            qrbox: 250
+        },
+        onScanSuccess
+    ).then(() => {
+        scannerRunning = true;
+    }).catch(err => {
+        console.error("Erreur démarrage caméra :", err);
+    });
+}
 
-// ✅ Forcer caméra arrière
+// Charger caméras disponibles
 Html5Qrcode.getCameras().then(devices => {
     if (devices && devices.length) {
+        cameras = devices;
 
-        // Cherche caméra arrière
-        let backCamera = devices.find(device =>
-            device.label.toLowerCase().includes('back') ||
-            device.label.toLowerCase().includes('rear')
+        // Par défaut on prend la caméra arrière si possible
+        let backIndex = devices.findIndex(device =>
+            device.label.toLowerCase().includes("back") ||
+            device.label.toLowerCase().includes("rear") ||
+            device.label.toLowerCase().includes("environment")
         );
 
-        const cameraId = backCamera ? backCamera.id : devices[0].id;
+        currentCameraIndex = backIndex !== -1 ? backIndex : 0;
 
-        html5QrCode.start(
-            cameraId,
-            {
-                fps: 10,
-                qrbox: 250
-            },
-            onScanSuccess
-        );
+        startScanner(cameras[currentCameraIndex].id);
     }
+}).catch(err => {
+    console.error("Erreur accès caméras :", err);
 });
 
 // Export CSV
@@ -184,3 +194,4 @@ function clearData() {
 
 </body>
 </html>
+
