@@ -84,6 +84,14 @@ function renderTable() {
 
 renderTable();
 
+// Message visuel
+const messageDiv = document.createElement("div");
+messageDiv.style.fontSize = "20px";
+messageDiv.style.fontWeight = "bold";
+messageDiv.style.color = "green";
+messageDiv.style.marginTop = "10px";
+document.body.insertBefore(messageDiv, document.querySelector("table"));
+
 function onScanSuccess(decodedText) {
 
     // Éviter doublons immédiats
@@ -103,15 +111,33 @@ function onScanSuccess(decodedText) {
     localStorage.setItem("barcode_scans", JSON.stringify(scans));
 
     renderTable();
+
+    // ✅ Afficher message
+    messageDiv.innerText = "✅ Passer à l'article suivant";
+
+    // Effacer message après 2 secondes
+    setTimeout(() => {
+        messageDiv.innerText = "";
+    }, 2000);
 }
 
 // Initialiser scanner
 const html5QrCode = new Html5Qrcode("reader");
 
+// ✅ Forcer caméra arrière
 Html5Qrcode.getCameras().then(devices => {
     if (devices && devices.length) {
+
+        // Cherche caméra arrière
+        let backCamera = devices.find(device =>
+            device.label.toLowerCase().includes('back') ||
+            device.label.toLowerCase().includes('rear')
+        );
+
+        const cameraId = backCamera ? backCamera.id : devices[0].id;
+
         html5QrCode.start(
-            devices[0].id,
+            cameraId,
             {
                 fps: 10,
                 qrbox: 250
