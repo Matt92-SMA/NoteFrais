@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scanner Code Barre</title>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background: #f5f5f5;
+}
+#reader {
+    width: 300px;
+    margin: 20px auto;
+}
+button {
+    padding: 10px 15px;
+    margin: 5px;
+    border: none;
+    background: #0d6efd;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+}
+button:hover {
+    opacity: 0.8;
+}
+table {
+    width: 90%;
+    margin: 20px auto;
+    border-collapse: collapse;
+    background: white;
+}
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
+th {
+    background: #0d6efd;
+    color: white;
+}
+</style>
+
+</head>
+<body>
+
+<h2>Lecteur de Code Barre</h2>
+
+<div id="reader"></div>
+
+<button onclick="exportCSV()">Exporter en CSV</button>
+<button onclick="clearData()">Vider les données</button>
+
+<table>
+    <thead>
+        <tr>
+            <th>Code Barre</th>
+            <th>Date / Heure</th>
+        </tr>
+    </thead>
+    <tbody id="dataTable"></tbody>
+</table>
+
+<script>
+
+// Charger données existantes
+let scans = JSON.parse(localStorage.getItem("barcode_scans")) || [];
+const tableBody = document.getElementById("dataTable");
+
+function renderTable() {
+    tableBody.innerHTML = "";
+    scans.forEach(scan => {
+        let row = `<tr>
+            <td>${scan.code}</td>
+            <td>${scan.date}</td>
+        </tr>`;
+        tableBody.innerHTML += row;
+    });
+}
+
+renderTable();
+
+function onScanSuccess(decodedText) {
+
+    // Éviter doublons immédiats
+    if (scans.length > 0 && scans[scans.length - 1].code === decodedText) {
+        return;
+    }
+
+    const now = new Date();
+    const formattedDate = now.toLocaleString();
+
+    const scanData = {
+        code: decodedText,
+        date: formattedDate
+    };
+
+    scans.push(scanData);
+    localStorage.setItem("barcode_scans", JSON.stringify(scans));
+
+    renderTable();
+}
+
+// Initialiser scanner
+const html5QrCode = new Html5Qrcode("reader");
+
+Html5Qrcode.getCameras().then(devices => {
+    if (devices && devices.length) {
+        html5QrCode.start(
+            devices[0].id,
+            {
+                fps: 10,
+                qrbox: 250
+            },
+            onScanSuccess
+        );
+    }
+});
+
+// Export CSV
+function exportCSV() {
+    if (scans.length === 0) {
+        alert("Aucune donnée à exporter.");
+        return;
+    }
+
+    let csvContent = "Code Barre,Date Heure\n";
+
+    scans.forEach(scan => {
+        csvContent += `"${scan.code}","${scan.date}"\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "scans_code_barre.csv";
+    a.click();
+
+    URL.revokeObjectURL(url);
+}
+
+// Vider données
+function clearData() {
+    if (confirm("Supprimer toutes les données ?")) {
+        localStorage.removeItem("barcode_scans");
+        scans = [];
+        renderTable();
+    }
+}
+
+</script>
+
+</body>
+</html>
