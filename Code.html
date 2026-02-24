@@ -77,7 +77,8 @@ let html5QrCode = new Html5Qrcode("reader");
 let cameras = [];
 let currentCameraIndex = 0;
 let scannerRunning = false;
-
+let lastScanTime = 0;
+    
 const tableBody = document.getElementById("dataTable");
 
 // ===============================
@@ -90,14 +91,11 @@ function renderTable() {
     scans.forEach(scan => {
         const tr = document.createElement("tr");
 
-        const tdCode = document.createElement("td");
-        tdCode.textContent = scan.code;
-
-        const tdDate = document.createElement("td");
-        tdDate.textContent = scan.date;
-
-        tr.appendChild(tdCode);
-        tr.appendChild(tdDate);
+        tr.innerHTML = `
+            <td>${scan.code}</td>
+            <td>${scan.quantity}</td>
+            <td>${scan.lastScan}</td>
+        `;
 
         tableBody.appendChild(tr);
     });
@@ -123,35 +121,34 @@ document.body.insertBefore(messageDiv, document.querySelector("table"));
 
 function onScanSuccess(decodedText) {
 
-    // Éviter doublon immédiat
-    if (scans.length > 0 && scans[scans.length - 1].code === decodedText) {
-        return;
-    }
-
+const nowTime = Date.now();
+if (nowTime - lastScanTime < 800) return;
+lastScanTime = nowTime;
+    
     const now = new Date();
     const formattedDate = now.toLocaleString();
 
-    const scanData = {
-        code: decodedText,
-        date: formattedDate
-    };
+    // Cherche si le code existe déjà
+    let existing = scans.find(item => item.code === decodedText);
 
-    scans.push(scanData);
-    localStorage.setItem("barcode_scans", JSON.stringify(scans));
-
-    renderTable();
-
-    // Vibration mobile
-    if (navigator.vibrate) {
-        navigator.vibrate(200);
+    if (existing) {
+        existing.quantity += 1;
+        existing.lastScan = formattedDate;
+    } else {
+        scans.push({
+            code: decodedText,
+            quantity: 1,
+            lastScan: formattedDate
+        });
     }
 
-    messageDiv.innerText = "✅ Passer à l'article suivant";
+    localStorage.setItem("barcode_scans", JSON.stringify(scans));
+    renderTable();
 
-    setTimeout(() => {
-        messageDiv.innerText = "";
-    }, 2000);
-}
+    if (navigator.vibrate) navigator.vibrate(100);
+
+    messageDiv.innerText = "✔️ Article ajouté";
+    setTimeout(() => messageDiv.innerText = "", 1000);
 
 // ===============================
 // DÉMARRAGE SCANNER
@@ -159,19 +156,18 @@ function onScanSuccess(decodedText) {
 
 function startScanner(cameraConfig) {
 
-    html5QrCode.start(
-        cameraConfig,
-        {
-            fps: 10,
-            qrbox: 250
-        },
-        onScanSuccess
-    ).then(() => {
-        scannerRunning = true;
-    }).catch(err => {
-        console.error("Erreur démarrage caméra :", err);
-    });
-}
+html5QrCode.start(
+    cameraConfig,
+    {
+        fps: 15,
+        qrbox: { width: 300, height: 150 }, // rectangle horizontal
+        aspectRatio: 1.777, // meilleur pour caméra mobile
+        experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true
+        }
+    },
+    onScanSuccess
+)
 
 // Charger caméras
 Html5Qrcode.getCameras().then(devices => {
@@ -262,3 +258,4 @@ function clearData() {
 
 </body>
 </html>
+
