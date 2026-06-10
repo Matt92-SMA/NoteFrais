@@ -1,261 +1,551 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Scanner Code Barre</title>
+
+<title>Inventaire Code Barre</title>
 
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <style>
-body {
-    font-family: Arial, sans-serif;
-    text-align: center;
-    background: #f5f5f5;
+
+body{
+    font-family:Arial,sans-serif;
+    background:#f5f5f5;
+    text-align:center;
+    margin:20px;
 }
-#reader {
-    width: 300px;
-    margin: 20px auto;
+
+#reader{
+    width:320px;
+    margin:auto;
 }
-button {
-    padding: 10px 15px;
-    margin: 5px;
-    border: none;
-    background: #0d6efd;
-    color: white;
-    border-radius: 5px;
-    cursor: pointer;
+
+button{
+    padding:10px 15px;
+    margin:5px;
+    border:none;
+    border-radius:5px;
+    cursor:pointer;
 }
-button:hover {
-    opacity: 0.8;
+
+.btn-primary{
+    background:#0d6efd;
+    color:white;
 }
-table {
-    width: 90%;
-    margin: 20px auto;
-    border-collapse: collapse;
-    background: white;
+
+.btn-success{
+    background:#198754;
+    color:white;
 }
-th, td {
-    border: 1px solid #ddd;
-    padding: 8px;
+
+.btn-danger{
+    background:#dc3545;
+    color:white;
 }
-th {
-    background: #0d6efd;
-    color: white;
+
+table{
+    width:95%;
+    margin:auto;
+    margin-top:20px;
+    border-collapse:collapse;
+    background:white;
 }
+
+th,td{
+    border:1px solid #ddd;
+    padding:8px;
+}
+
+th{
+    background:#0d6efd;
+    color:white;
+}
+
+#productPreview{
+    display:none;
+    width:400px;
+    margin:20px auto;
+    background:white;
+    border-radius:10px;
+    padding:20px;
+    box-shadow:0 0 10px rgba(0,0,0,0.15);
+}
+
+#message{
+    font-size:20px;
+    font-weight:bold;
+    color:green;
+    margin:15px;
+}
+
 </style>
+
 </head>
 
 <body>
 
-<h2>Lecteur de Code Barre</h2>
+<h2>Inventaire Code Barre</h2>
 
 <div id="reader"></div>
 
-<button onclick="exportCSV()">Exporter en CSV</button>
-<button onclick="clearData()">Vider les données</button>
-<button onclick="switchCamera()">Changer de caméra</button>
+<div id="message"></div>
+
+<div id="productPreview">
+
+    <h3>Produit détecté</h3>
+
+    <p>
+        <strong>Code :</strong>
+        <span id="previewCode"></span>
+    </p>
+
+    <p>
+        <strong>Nom :</strong>
+        <span id="previewName"></span>
+    </p>
+
+    <p>
+        <strong>Référence :</strong>
+        <span id="previewRef"></span>
+    </p>
+
+    <button class="btn-success" onclick="confirmScan()">
+        ✅ Confirmer
+    </button>
+
+    <button class="btn-danger" onclick="cancelScan()">
+        ❌ Annuler
+    </button>
+
+</div>
+
+<div>
+
+    <button class="btn-primary" onclick="exportCSV()">
+        Export CSV
+    </button>
+
+    <button class="btn-danger" onclick="clearData()">
+        Vider les données
+    </button>
+
+    <button class="btn-primary" onclick="switchCamera()">
+        Changer caméra
+    </button>
+
+</div>
 
 <table>
+
 <thead>
 <tr>
-<th>Code Barre</th>
-<th>Date / Heure</th>
+    <th>Code Barre</th>
+    <th>Produit</th>
+    <th>Quantité</th>
+    <th>Dernier Scan</th>
 </tr>
 </thead>
+
 <tbody id="dataTable"></tbody>
+
 </table>
 
 <script>
 
-// ===============================
-// VARIABLES GLOBALES
-// ===============================
+// =====================================================
+// BASE PRODUITS
+// =====================================================
 
-let scans = JSON.parse(localStorage.getItem("barcode_scans")) || [];
-let html5QrCode = new Html5Qrcode("reader");
+const productsDB = {
+
+    "1234567890123": {
+        name: "Clavier Logitech K120",
+        reference: "LOG-K120"
+    },
+
+    "9876543210987": {
+        name: "Souris HP M100",
+        reference: "HP-M100"
+    },
+
+    "3700000000001": {
+        name: "Écran Dell 24 pouces",
+        reference: "DEL-24"
+    }
+
+};
+
+// =====================================================
+// VARIABLES
+// =====================================================
+
+let scans =
+    JSON.parse(
+        localStorage.getItem("barcode_scans")
+    ) || [];
+
+let pendingScan = null;
+
+let html5QrCode =
+    new Html5Qrcode("reader");
+
 let cameras = [];
+
 let currentCameraIndex = 0;
+
 let lastScanTime = 0;
 
-const tableBody = document.getElementById("dataTable");
+const tableBody =
+    document.getElementById("dataTable");
 
-// ===============================
-// AFFICHAGE TABLE
-// ===============================
+const messageDiv =
+    document.getElementById("message");
 
-function renderTable() {
+// =====================================================
+// TABLEAU
+// =====================================================
+
+function renderTable(){
+
     tableBody.innerHTML = "";
 
     scans.forEach(scan => {
-        const tr = document.createElement("tr");
+
+        const tr =
+            document.createElement("tr");
 
         tr.innerHTML = `
             <td>${scan.code}</td>
-            <td>${scan.quantity || 1}</td>
-            <td>${scan.lastScan || scan.date}</td>
+            <td>${scan.name}</td>
+            <td>${scan.quantity}</td>
+            <td>${scan.lastScan}</td>
         `;
 
         tableBody.appendChild(tr);
+
     });
+
 }
 
 renderTable();
 
-// ===============================
-// MESSAGE VISUEL
-// ===============================
+// =====================================================
+// MESSAGE
+// =====================================================
 
-const messageDiv = document.createElement("div");
-messageDiv.style.fontSize = "20px";
-messageDiv.style.fontWeight = "bold";
-messageDiv.style.color = "green";
-messageDiv.style.marginTop = "10px";
+function showMessage(text,color="green"){
 
-document.body.insertBefore(messageDiv, document.querySelector("table"));
+    messageDiv.style.color = color;
+    messageDiv.innerText = text;
 
-// ===============================
-// SCAN SUCCESS
-// ===============================
+    setTimeout(()=>{
+        messageDiv.innerText = "";
+    },1500);
 
-function onScanSuccess(decodedText) {
+}
+
+// =====================================================
+// SCAN
+// =====================================================
+
+function onScanSuccess(decodedText){
 
     const nowTime = Date.now();
-    if (nowTime - lastScanTime < 800) return;
-    lastScanTime = nowTime;
 
-    const now = new Date();
-    const formattedDate = now.toLocaleString();
-
-    let existing = scans.find(item => item.code === decodedText);
-
-    if (existing) {
-        existing.quantity = (existing.quantity || 1) + 1;
-        existing.lastScan = formattedDate;
-    } else {
-        scans.push({
-            code: decodedText,
-            quantity: 1,
-            lastScan: formattedDate
-        });
+    if(nowTime - lastScanTime < 1000){
+        return;
     }
 
-    localStorage.setItem("barcode_scans", JSON.stringify(scans));
+    lastScanTime = nowTime;
+
+    const product =
+        productsDB[decodedText];
+
+    pendingScan = {
+
+        code: decodedText,
+
+        product: product || {
+
+            name: "Produit inconnu",
+            reference: "-"
+
+        }
+
+    };
+
+    document.getElementById(
+        "previewCode"
+    ).innerText = pendingScan.code;
+
+    document.getElementById(
+        "previewName"
+    ).innerText = pendingScan.product.name;
+
+    document.getElementById(
+        "previewRef"
+    ).innerText = pendingScan.product.reference;
+
+    document.getElementById(
+        "productPreview"
+    ).style.display = "block";
+
+}
+
+// =====================================================
+// CONFIRMATION
+// =====================================================
+
+function confirmScan(){
+
+    if(!pendingScan) return;
+
+    const now =
+        new Date().toLocaleString();
+
+    let existing =
+        scans.find(
+            item => item.code === pendingScan.code
+        );
+
+    if(existing){
+
+        existing.quantity++;
+
+        existing.lastScan = now;
+
+    }
+    else{
+
+        scans.push({
+
+            code: pendingScan.code,
+
+            name: pendingScan.product.name,
+
+            quantity: 1,
+
+            lastScan: now
+
+        });
+
+    }
+
+    localStorage.setItem(
+        "barcode_scans",
+        JSON.stringify(scans)
+    );
+
     renderTable();
 
-    if (navigator.vibrate) navigator.vibrate(100);
+    document.getElementById(
+        "productPreview"
+    ).style.display = "none";
 
-    messageDiv.innerText = "✔️ Article ajouté";
-    setTimeout(() => messageDiv.innerText = "", 1000);
+    pendingScan = null;
+
+    if(navigator.vibrate){
+        navigator.vibrate(100);
+    }
+
+    showMessage("✔ Produit enregistré");
+
 }
 
-// ===============================
-// DÉMARRAGE SCANNER
-// ===============================
+// =====================================================
+// ANNULATION
+// =====================================================
 
-function startScanner(cameraConfig) {
+function cancelScan(){
+
+    pendingScan = null;
+
+    document.getElementById(
+        "productPreview"
+    ).style.display = "none";
+
+    showMessage(
+        "❌ Scan annulé",
+        "red"
+    );
+
+}
+
+// =====================================================
+// SCANNER
+// =====================================================
+
+function startScanner(cameraConfig){
 
     html5QrCode.start(
+
         cameraConfig,
+
         {
-            fps: 15,
-            qrbox: { width: 150, height: 100 },
-            aspectRatio: 1.777,
-            experimentalFeatures: {
-                useBarCodeDetectorIfSupported: true
+            fps:15,
+            qrbox:{
+                width:200,
+                height:120
             }
         },
+
         onScanSuccess
-    ).catch(err => {
-        console.error("Erreur démarrage caméra :", err);
+
+    ).catch(err=>{
+
+        console.error(err);
+
     });
+
 }
 
-// ===============================
-// CHARGER CAMÉRAS
-// ===============================
+// =====================================================
+// CAMERAS
+// =====================================================
 
-Html5Qrcode.getCameras().then(devices => {
+Html5Qrcode.getCameras()
 
-    if (!devices || devices.length === 0) {
-        alert("Aucune caméra détectée");
+.then(devices=>{
+
+    if(!devices.length){
+
+        alert(
+            "Aucune caméra détectée"
+        );
+
         return;
+
     }
 
     cameras = devices;
-    startScanner({ facingMode: "environment" });
 
-}).catch(err => {
-    console.error("Erreur accès caméras :", err);
+    startScanner({
+        facingMode:"environment"
+    });
+
+})
+
+.catch(err=>{
+
+    console.error(err);
+
 });
 
-// ===============================
-// CHANGER CAMÉRA
-// ===============================
+// =====================================================
+// CHANGER CAMERA
+// =====================================================
 
-function switchCamera() {
+function switchCamera(){
 
-    if (!cameras.length) return;
+    if(!cameras.length) return;
 
-    html5QrCode.stop().then(() => {
+    html5QrCode.stop()
+
+    .then(()=>{
 
         currentCameraIndex++;
-        if (currentCameraIndex >= cameras.length) {
+
+        if(
+            currentCameraIndex >=
+            cameras.length
+        ){
             currentCameraIndex = 0;
         }
 
-        startScanner(cameras[currentCameraIndex].id);
+        startScanner(
+            cameras[currentCameraIndex].id
+        );
 
-        messageDiv.innerText = "📷 Caméra changée";
-        setTimeout(() => messageDiv.innerText = "", 2000);
+        showMessage("📷 Caméra changée");
 
-    }).catch(err => {
-        console.error("Erreur changement caméra :", err);
+    })
+
+    .catch(err=>{
+
+        console.error(err);
+
     });
+
 }
 
-// ===============================
+// =====================================================
 // EXPORT CSV
-// ===============================
+// =====================================================
 
-function exportCSV() {
+function exportCSV(){
 
-    if (scans.length === 0) {
-        alert("Aucune donnée à exporter.");
+    if(scans.length === 0){
+
+        alert(
+            "Aucune donnée à exporter"
+        );
+
         return;
+
     }
 
-    let csvContent = "Code Barre,Quantité,Dernier Scan\n";
+    let csv =
+        "Code Barre,Produit,Quantité,Dernier Scan\n";
 
-    scans.forEach(scan => {
-        csvContent += `"${scan.code}","${scan.quantity}","${scan.lastScan}"\n`;
+    scans.forEach(scan=>{
+
+        csv += `"${scan.code}","${scan.name}","${scan.quantity}","${scan.lastScan}"\n`;
+
     });
 
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
+    const blob =
+        new Blob(
+            [csv],
+            {type:"text/csv"}
+        );
 
-    const a = document.createElement("a");
+    const url =
+        URL.createObjectURL(blob);
+
+    const a =
+        document.createElement("a");
+
     a.href = url;
     a.download = "inventaire.csv";
     a.click();
 
     URL.revokeObjectURL(url);
+
 }
 
-// ===============================
-// VIDER DONNÉES
-// ===============================
+// =====================================================
+// RESET
+// =====================================================
 
-function clearData() {
+function clearData(){
 
-    if (confirm("Supprimer toutes les données ?")) {
-        localStorage.removeItem("barcode_scans");
+    if(
+        confirm(
+            "Supprimer toutes les données ?"
+        )
+    ){
+
         scans = [];
+
+        localStorage.removeItem(
+            "barcode_scans"
+        );
+
         renderTable();
+
+        showMessage(
+            "Données supprimées",
+            "red"
+        );
+
     }
+
 }
 
 </script>
 
-
-
+</body>
+</html>
